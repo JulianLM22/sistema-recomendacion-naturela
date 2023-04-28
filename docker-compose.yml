@@ -1,0 +1,23 @@
+version: '3'
+
+services:
+  rs:
+    build: ./rs
+    image: sistema_recomendaciones-rs
+    container_name: rs-1
+    restart: always
+    ports:
+      - '5000:5000'
+    volumes:
+      - ./rs:/app
+  recommendation-app:
+    build: ./recommendation-app
+    image: sistema_recomendaciones-recommendation-app
+    container_name: recommendation-app-1
+    restart: always
+    ports:
+      - '4200:80'
+    volumes:
+      - ./recommendation-app:/app
+    depends_on:
+      - rs
