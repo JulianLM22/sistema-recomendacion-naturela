@@ -1,0 +1,21 @@
+<div class="container-fluid">
+  <div class="row justify-content-md-center pt-14 mb-8">
+    <div class="input-group mb-3 ps-5 col-md-auto d-inline-flex search">
+      <span class="input-group-text" id="basic-addon1">Identificación</span>
+      <input type="text" class="form-control" [(ngModel)]="text" placeholder="Escriba la identificación del cliente"
+      #Buscar/><br/>
+    </div>
+    <div class="input-group mb-3 search">
+      <span class="input-group-text" id="basic-addon1">Cantidad productos</span>
+      <input type="number" class="form-control" [(ngModel)]="text2" placeholder="Escriba la cantidad de productos que quiere recomendar"
+     #BuscarCan/><br/>
+    </div>
+  </div>
+  <div class="d-grid gap-2 col-2 mx-auto pb-5">
+    <button class="btn bg-green-500 hover:bg-green-700 text-white" (click)="onReload()" (click)="buscar()">BUSCAR</button>
+  </div>
+  <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative lg:w-1/2 md:2/3 w-full mx-auto mb-8 text-center" *ngIf="errorMsg">
+    La identificación ingresada es inválida! inténtalo nuevamente.
+  </div>
+</div>
+

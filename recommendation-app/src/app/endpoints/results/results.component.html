@@ -1,0 +1,29 @@
+<div class="container container-fluid mt-2 mb-3">
+  <div class="flex justify-center">
+    <div class="bg-white border rounded-lg shadow-lg p-4 mb-5 md:w-2/3 lg:w-2/5 w-full">
+      <h1 class="font-bold mb-3 md:mr-4 text-center text-xl">Información del cliente</h1>
+      <div class="font-semibold" *ngFor="let d of data">
+        <p></p><span><b>Nombre:</b> {{d.nombre_cliente | titlecase}}</span>
+        <p></p><span><b>Identificación:</b> {{d.id_cliente}} </span>
+        <p></p><span><b>Ciudad:</b> {{d.ciudad}} </span>
+      </div>
+    </div>
+  </div>
+
+  <div class="border rounded-lg shadow-lg lg:w-4/5 w-full flex mx-auto">
+    <table class="table table-striped">
+      <thead class="bg-green-100">
+        <tr>
+          <th>Código Producto</th>
+          <th>Nombre Producto</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let res of resultados">
+          <td>{{ res.codigo_pt }}</td>
+          <td>{{ res.producto_terminado }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
