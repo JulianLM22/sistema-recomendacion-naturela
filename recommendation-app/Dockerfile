@@ -18,5 +18,5 @@ FROM nginx:latest
 COPY --from=build /app/dist/recommendation-app/ /usr/share/nginx/html
 
 # Expose port 4200
-EXPOSE 80
+EXPOSE 4200
 
