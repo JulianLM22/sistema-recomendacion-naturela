@@ -12,13 +12,13 @@ export class EndpointsService {
   private apiUrl: string = 'http://127.0.0.1:5000';
   public resultados: Prediction[] = [];
   public data: Data[] = [];
-  public errorMsg;
+  public errorMsg = 'error';
 
   //Importacion de HttpClient para hacer peticiones HTTP
   constructor(private http: HttpClient) {
     this.resultados = JSON.parse(localStorage.getItem('resultados')!) || [];
     this.data = JSON.parse(localStorage.getItem('data')!) || [];
-    this.errorMsg = localStorage.getItem('errorMsg')! || '';
+    this.errorMsg = 'error';
   }
 
 
@@ -38,7 +38,7 @@ export class EndpointsService {
       this.errorMsg = 'error';
     },
     error => {
-      this.errorMsg = "Error: ";
+      this.errorMsg = "Error";
     });
   };
 
@@ -56,7 +56,7 @@ export class EndpointsService {
       this.errorMsg = 'error';
     },
     error => {
-      localStorage.setItem('errorMsg', JSON.stringify(error));
+      this.errorMsg = "Error";
     });
   };
 
