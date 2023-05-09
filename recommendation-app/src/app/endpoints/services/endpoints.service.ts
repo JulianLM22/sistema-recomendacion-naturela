@@ -8,14 +8,17 @@ import { Data, General, Prediction } from '../interface/predictions.interface';
 
 export class EndpointsService {
 
-  private apiUrl: string = 'http://ec2-34-202-165-117.compute-1.amazonaws.com:5000';
+  // private apiUrl: string = 'http://ec2-34-202-165-117.compute-1.amazonaws.com:5000';
+  private apiUrl: string = 'http://127.0.0.1:5000';
   public resultados: Prediction[] = [];
   public data: Data[] = [];
+  public errorMsg;
 
   //Importacion de HttpClient para hacer peticiones HTTP
   constructor(private http: HttpClient) {
     this.resultados = JSON.parse(localStorage.getItem('resultados')!) || [];
     this.data = JSON.parse(localStorage.getItem('data')!) || [];
+    this.errorMsg = localStorage.getItem('errorMsg')! || '';
   }
 
 
@@ -32,9 +35,10 @@ export class EndpointsService {
     this.http.post<General>(`${servicioUrl}`, body).subscribe((resp: any) => {
       this.resultados = resp.prediction;
       localStorage.setItem('resultados', JSON.stringify(this.resultados));
+      this.errorMsg = 'error';
     },
     error => {
-      console.log(error.message);
+      this.errorMsg = "Error: ";
     });
   };
 
@@ -49,9 +53,17 @@ export class EndpointsService {
     this.http.post<General>(`${servicioUrl}`, body).subscribe((resp: any) => {
       this.data = resp.data;
       localStorage.setItem('data', JSON.stringify(this.data));
+      this.errorMsg = 'error';
     },
     error => {
-      console.log(error.message);
+      localStorage.setItem('errorMsg', JSON.stringify(error));
     });
   };
+
+  entrenar = () => {
+    const servicioUrl: string = `${this.apiUrl}/train`;
+    this.http.post<General>(`${servicioUrl}`, {}).subscribe((resp: any) => {
+      console.log(this.errorMsg);
+    });
+  }
 }

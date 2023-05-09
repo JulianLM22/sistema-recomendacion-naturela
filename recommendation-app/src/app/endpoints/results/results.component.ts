@@ -16,10 +16,9 @@ export class ResultsComponent {
     return this.endpointsService.data;
   }
 
-  // get error(){
-  //   return this.endpointsService.errorMsg;
-  // }
-
+  get errorMsg(){
+    return this.endpointsService.errorMsg;
+  }
   constructor(private endpointsService: EndpointsService) { }
 
 
