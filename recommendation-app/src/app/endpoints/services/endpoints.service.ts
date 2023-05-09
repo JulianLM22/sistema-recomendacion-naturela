@@ -8,8 +8,8 @@ import { Data, General, Prediction } from '../interface/predictions.interface';
 
 export class EndpointsService {
 
-  // private apiUrl: string = 'http://ec2-34-202-165-117.compute-1.amazonaws.com:5000';
-  private apiUrl: string = 'http://127.0.0.1:5000';
+  private apiUrl: string = 'http://ec2-34-202-165-117.compute-1.amazonaws.com:5000';
+  // private apiUrl: string = 'http://127.0.0.1:5000';
   public resultados: Prediction[] = [];
   public data: Data[] = [];
   public errorMsg = 'error';
