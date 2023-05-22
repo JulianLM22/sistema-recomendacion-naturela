@@ -1,5 +1,6 @@
 export interface General{
   prediction: Prediction[];
+  predictionC: PredictionC[];
   data: Data[];
 }
 
@@ -7,9 +8,16 @@ export interface Prediction {
   codigo_pt: string;
   est: number;
   producto_terminado: string;
-  pt_id: number;
+  id_pt: number;
 }
-
+export interface PredictionC {
+  categoria:          null;
+  codigo_pt:          string;
+  id_pt:              number;
+  num_pt:             number;
+  producto_terminado: string;
+  puntaje:            number;
+}
 export interface Data {
   ciudad:         string;
   departamento:   string;
@@ -23,3 +31,4 @@ export interface Data {
   tipo_id:        string;
   tipo_persona:   string;
 }
+

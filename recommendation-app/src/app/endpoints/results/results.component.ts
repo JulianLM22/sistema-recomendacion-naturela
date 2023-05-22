@@ -12,6 +12,10 @@ export class ResultsComponent {
     return this.endpointsService.resultados;
   }
 
+  // get resultadosC() {
+  //   return this.endpointsService.resultadosC;
+  // }
+
   get data(){
     return this.endpointsService.data;
   }

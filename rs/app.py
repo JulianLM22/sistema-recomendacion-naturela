@@ -1,14 +1,14 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 from surprise import Dataset, Reader, SVD
 from surprise.model_selection import train_test_split
 from surprise.model_selection import cross_validate
 from surprise.dump import dump, load
+from sklearn.metrics import mean_squared_error
 import pandas as pd
+import numpy as np
 import psycopg2
 from sklearn.preprocessing import MinMaxScaler
-import surprise
-import csv
 import pickle
 
 app = Flask(__name__)
@@ -27,38 +27,31 @@ cur = conn.cursor()
 
 # Load dataset and train model on server start
 
+cur.execute("SELECT * FROM datos_pt ORDER BY id ASC")#
+rows4 = cur.fetchall()#
+df = pd.DataFrame(rows4, columns=['id_pt', 'codigo_pt', 'producto_terminado', 'categoria'])#
+
 cur.execute("SELECT * FROM dim_producto_ter ORDER BY pt_id ASC")
 rows = cur.fetchall()
 pt_df = pd.DataFrame(rows, columns=['codigo_pt', 'producto_terminado', 'pt_id'])
-#pt_df.to_csv("Inventario Producto Terminado.csv")
 
 cur.execute("SELECT * FROM datos_cliente ORDER BY id ASC")
 rows2 = cur.fetchall()
 dc_df = pd.DataFrame(rows2, columns=['id_cliente', 'id', 'tipo_cliente', 'tipo_persona', 'tipo_id', 'nombre_cliente', 'nombre_est','naturaleza', 'ciudad', 'departamento', 'pais'])
-#dc_df.to_csv("datos_clientes.csv")
 
-cur.execute("SELECT * FROM datos_ventas ORDER BY id_v ASC")
+cur.execute("select  pt.id_cliente,  pt.producto_terminado, CASE WHEN max-min = 0  THEN 1 ELSE round(4*(pt.cantidad - acum.min)/(max-min)+1) END as cantidad from( SELECT  id_cliente,  producto_terminado, sum(cantidad) cantidad FROM public.datos_ventas group by id_cliente,  producto_terminado) pt inner join (select id_cliente, max(cantidad) max, min(cantidad)min from (SELECT  id_cliente,  producto_terminado, sum(cantidad) cantidad FROM public.datos_ventas group by id_cliente,  producto_terminado) t2 group by id_cliente )acum on acum.id_cliente = pt.id_cliente")
 rows3 = cur.fetchall()
-dv_df = pd.DataFrame(rows3, columns=['id_v', 'tipo_cliente', 'tipo_persona', 'tipo_id', 'id_cliente', 'nombre_cliente', 'nombre_est', 'producto_terminado', 'cantidad', 'fecha_pedido'])
-dv_df = pd.merge(dv_df, pt_df[['producto_terminado', 'codigo_pt', 'pt_id']], on='producto_terminado', how='outer')
-dv_df['codigo_pt'] = dv_df['codigo_pt'].fillna('noCode')
-dv_df['pt_id'] = dv_df['pt_id'].fillna(0.0)
+dv_df = pd.DataFrame(rows3, columns=['id_cliente', 'producto_terminado', 'cantidad'])
+dv_df = pd.merge(dv_df, df[['producto_terminado', 'codigo_pt', 'id_pt']], on='producto_terminado', how='outer')
+dv_df['id_pt'] = dv_df['id_pt'].fillna(0.0)
+data_final = dv_df[['id_cliente', 'id_pt', 'cantidad']]
 
 #Cerrar conexión DB
 cur.close()
 conn.close()
 
-# Load dataset and train model on server start
-
-df_compras = dv_df[['id_cliente', 'pt_id', 'cantidad']]
-# Agrupar las compras por cliente
-compras_por_cliente = df_compras.groupby(['id_cliente','pt_id'])['cantidad'].sum().reset_index()
-# Crear un objeto MinMaxScaler
-scaler = MinMaxScaler(feature_range=(1, 5))
-# Escalar las compras por cliente
-compras_por_cliente['cantidad'] = scaler.fit_transform(compras_por_cliente[['cantidad']])
-#GUARDA LOS DATOS ESCALADOS
-compras_por_cliente.to_csv('scaled_data.csv', index=False)
+# #GUARDA LOS DATOS ESCALADOS
+data_final.to_csv('scaled_data.csv', index=False)
 svd = SVD(verbose=True, n_epochs=10)
 
 @app.route('/train', methods=['POST'])
@@ -69,12 +62,11 @@ def train():
     sales_data = Dataset.load_from_file('scaled_data.csv', reader=reader)
     cross_validate(svd, sales_data, measures=['RMSE', 'MAE'], cv=3, verbose=True)
     # Dividir los datos en conjuntos de entrenamiento y prueba
-    trainset1, testset = train_test_split(sales_data, test_size=0.2)
-    #tren = trainset1.build_full_trainset() 
+    trainset1, testset = train_test_split(sales_data)
     svd.fit(trainset1)
     # Evaluar modelo
     predictions = svd.test(testset)
-    # Guardar el modelorrrrrrrrr
+    # Guardar el modelo
     with open('modelo_entrenado.pkl', 'wb') as f:
         pickle.dump(svd, f)
     return jsonify({'prediction': predictions})
@@ -83,47 +75,44 @@ def train():
 def predict():
     import surprise
 
-    # Check if all required fields are present in the request
+    # Verifica si los campos requeiridos están presentes en la petición
     if not request.json or 'user_id' not in request.json or 'item_id' not in request.json:
         return jsonify({'error': 'Missing required fields.'}), 400
 
     try:
         
-        # Load trained model
+        # Carga el modelo entrenado
         with open('modelo_entrenado.pkl', 'rb') as f:
             model = pickle.load(f)
 
-        # Check if the model is valid and loaded correctly
+        # Verifica si el modelo es válido y se cargó correctamente
         if not isinstance(model, surprise.prediction_algorithms.matrix_factorization.SVD):
             return jsonify({'error': 'Invalid model.'}), 500
 
-        # load data from request
+        # Carga los datos de la petición
         user_id = request.json['user_id']
         num_items = request.json['item_id']
 
-        # Load data from items
-        items = pt_df
-        #items = items.rename(columns={'item_id': 'iid'})
-        # Get top n recommendations for the user
+        # Carga el dataset de productos
+        items = df
 
-        # Get Items from User
+        # Carga los productos que el usuario no ha comprado
         user_items = [(model.trainset.to_raw_iid(inner_iid), rating) for (inner_iid, rating) in model.trainset.ur[model.trainset.to_inner_uid(user_id)]]
         ids_raw = [model.trainset.to_raw_iid(iid) for iid in model.trainset.all_items()]
-        array = [i[0] for i in user_items if i[0] not in ids_raw]
-        double_array = [float(x) for x in array]
-        user_unseen_items = list(set(ids_raw)-set(double_array))
+        array = [i[0] for i in user_items if i[0] in ids_raw]
+        user_unseen_items = list(set(ids_raw)-set(array))
 
-        # Make Predictions
+        # Predicciones
         predictions = [model.predict(uid=user_id, iid=str(iid)) for iid in user_unseen_items]
 
-        #Order By value
+        #Ordenar los resultados
         top_n = pd.DataFrame(predictions).sort_values(by='est', ascending=False).head(num_items)
-        top_n['pt_id'] = top_n['iid'].astype(float)
+        top_n['id_pt'] = top_n['iid'].astype(int)
         
-        
-        top_n = pd.concat([top_n.set_index('pt_id'), items.set_index('pt_id')], axis=1, join='inner')
+        # Concatenar los resultados con los datos de productos
+        top_n = pd.concat([top_n.set_index('id_pt'), items.set_index('id_pt')], axis=1, join='inner')
         top_n = top_n[['producto_terminado', 'codigo_pt', 'est']].reset_index().to_dict('records')
-        # Return prediction
+        # Retornar los resultados
         return jsonify({'prediction': top_n}), 200
 
     except Exception as e:
@@ -136,10 +125,10 @@ def data():
 
     try:
 
-        # load data from request
+        # Carga los datos de la petición
         user_id = request.json['user_id']
 
-        #Load clients data
+        #Carga de datos de los clientes
         data = dc_df
         filtered_data = data.loc[data['id_cliente'] == user_id]
         obj = filtered_data.to_dict('records')
@@ -147,69 +136,6 @@ def data():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-        
-@app.route('/', methods=['GET', 'POST'])
-def index():
-    if request.method == 'POST':
-        # Obtener los valores ingresados por el usuario
-        user_id = (request.form['valor1'])
-        num_items = (request.form['valor2'])
-    # Check if all required fields are present in the request
-        if not request.form or 'valor1' not in request.form or 'valor2' not in request.form:
-            return render_template('formulario.html', resultado={'error': 'Missing required fields.'})
-
-        try:
-            user_id = str(request.form['valor1'])
-            num_items = int(request.form['valor2'])
-            # Load trained model
-            model_tuple = load('model.pkl')
-            model = model_tuple[1]
-
-            # Check if the model is valid and loaded correctly
-            if not isinstance(model, surprise.prediction_algorithms.matrix_factorization.SVD):
-                return jsonify({'error': 'Invalid model.'}), 500
-
-            # load data from request
-            #user_id = request.json['user_id']
-            #num_items = request.json['item_id']
-
-            # Load data from items
-            items = pd.read_csv('nombre_productos.csv', sep=';')
-            #items = items.rename(columns={'item_id': 'iid'})
-            # Get top n recommendations for the user
-
-            # Get Items from User
-            user_items = model.trainset.ur[model.trainset.to_inner_uid(user_id)]
-            user_unseen_items = [iid for iid in model.trainset.all_items() if iid not in user_items]
-
-            # Make Predictions
-            predictions = [model.predict(uid=user_id, iid=str(iid)) for iid in user_unseen_items]
-
-            #Order By value
-            top_n = pd.DataFrame(predictions).sort_values(by='est', ascending=False).head(num_items)
-            top_n['item_id'] = top_n['iid'].astype(int)
-
-            top_n = pd.concat([top_n.set_index('item_id'), items.set_index('item_id')], axis=1, join='inner')
-            top_n = top_n[['item_name', 'est']].reset_index().to_dict('records')
-            # Return prediction
-            #return jsonify({'prediction': top_n}), 200
-            # Renderizar el template con el resultado
-            top_n = pd.DataFrame(top_n)
-            top_n = top_n.rename(columns={'item_name': 'Nombre del producto', 'item_id': 'Identificador del producto', 'est': 'Valor recomendación (1-5)'})
-
-            result_dict = top_n.to_dict(orient='records')
-
-            # Renderizar el template con el resultado
-            return render_template('resultado.html', resultado=result_dict)
-
-        except Exception as e:
-            #return jsonify({'error': str(e)}), 500
-            return render_template('formulario.html', resultado={'error': str(e)})
-
-        
-    else:
-        # Renderizar el template del formulario
-        return render_template('formulario.html', resultado={'info': 'Favor diligencie los valores'})
 
 if __name__ == '__main__':
     app.run()
